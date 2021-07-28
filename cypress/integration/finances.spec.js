@@ -1,5 +1,7 @@
 /// <reference types="cypress" />
 
+import { format, prepareLocalStorage } from '../support/utils'
+
 /**
  * Cadastrar entradas
  * Cadastrar saídas
@@ -25,8 +27,11 @@ context('Dev Finances Agilizei', () => {
     // afterEach -> depois de cada teste
 
     beforeEach(() => {
-        cy.visit('https://devfinance-agilizei.netlify.app/');
-        cy.get('#data-table tbody tr').should('have.length', 0);
+        cy.visit('https://devfinance-agilizei.netlify.app/', {
+            onBeforeLoad: (win) => {
+                prepareLocalStorage(win)
+            }
+        });
     });
     
     it('Cadastrar entradas', () => {
@@ -41,7 +46,7 @@ context('Dev Finances Agilizei', () => {
         cy.get('[type=date]').type('2021-07-27');
         cy.get('button').contains('Salvar').click(); // Mapeamento por tipo e valor
 
-        cy.get('#data-table tbody tr').should('have.length', 1);
+        cy.get('#data-table tbody tr').should('have.length', 3);
     });
 
     it('Cadastrar saídas', () => {
@@ -51,12 +56,12 @@ context('Dev Finances Agilizei', () => {
         // adicionar as asserç~;oes que a gente precisa
 
         cy.get('#transaction .button').click(); // #id -> Mapeamento por id. .classe -> Mapeamento por classe.
-        cy.get('#description').type('Mesada'); 
+        cy.get('#description').type('Refrigerante'); 
         cy.get('[name=amount]').type(-12); // [atributo=valor] -> Mapeamento por atributo.
         cy.get('[type=date]').type('2021-07-27');
         cy.get('button').contains('Salvar').click(); // Mapeamento por tipo e valor
 
-        cy.get('#data-table tbody tr').should('have.length', 1);
+        cy.get('#data-table tbody tr').should('have.length', 3);
     });
 
     it('Remover entradas e saídas', () => {
@@ -64,26 +69,11 @@ context('Dev Finances Agilizei', () => {
         // mapear os elementos que vamos interagir
         // descrever as interações com o cypress
         // adicionar as asserç~;oes que a gente precisa
-
-        const entrada = 'Total';
-        const saida = 'KinderOvo';
-
-        cy.get('#transaction .button').click(); // #id -> Mapeamento por id. .classe -> Mapeamento por classe.
-        cy.get('#description').type(entrada); 
-        cy.get('[name=amount]').type(100); // [atributo=valor] -> Mapeamento por atributo.
-        cy.get('[type=date]').type('2021-07-27');
-        cy.get('button').contains('Salvar').click(); // Mapeamento por tipo e valor
-        
-        cy.get('#transaction .button').click(); // #id -> Mapeamento por id. .classe -> Mapeamento por classe.
-        cy.get('#description').type(saida); 
-        cy.get('[name=amount]').type(-80); // [atributo=valor] -> Mapeamento por atributo.
-        cy.get('[type=date]').type('2021-07-27');
-        cy.get('button').contains('Salvar').click(); // Mapeamento por tipo e valor
        
         // Estratégia 01
         // Voltar para o elemento-pai (tr), e avançar para um td com atributo img
         cy.get('td.description')
-          .contains(entrada)
+          .contains("Mesada")
           .parent()
           .find('img[onclick*=remove]') // * -> procura pelo onclick que contenha o texto "remove".
           .click();
@@ -91,11 +81,46 @@ context('Dev Finances Agilizei', () => {
         // Estratégia 02
         // Buscar todos os irmãos do elemento, e buscar o que tem img + attr
         cy.get('td.description')
-          .contains(saida)
+          .contains("Suco Kapo")
           .siblings()
           .children('img[onclick*=remove]')
           .click();
 
         cy.get('#data-table tbody tr').should('have.length', 0);
+    });
+
+    it('Validar saldo com diversas transações', () => {
+        // capturar as linhas com as transações e as colunas com valores
+        // capturar o texto dessas colunas
+        // formatar esses valores das linhas
+
+        // somar os valores de entradas e saídas
+
+        // capturar o texto do total
+        // comparar o somatório de entradas e despesas com o total
+
+        let incomes = 0;
+        let expenses = 0;
+
+        cy.get('#data-table tbody tr')
+            .each(($el, index, $list) => { // elemento, índice, lista
+                cy.get($el).find('td.income, td.expense').invoke('text').then(text => { // invoca funções do javascript
+                    if(text.includes('-')){
+                        expenses = expenses + format(text)
+                    } else {
+                        incomes = incomes + format(text)
+                    }
+
+                    cy.log(`entradas`, incomes)
+                    cy.log(`saidas`, expenses)
+                }) 
+            }) 
+
+        cy.get('#totalDisplay').invoke('text').then(text => {
+            let formattedTotalDisplay = format(text)
+            let expectedTotal = incomes + expenses
+
+            expect(formattedTotalDisplay).to.eq(expectedTotal)
+        })
     });
 });
